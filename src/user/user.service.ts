@@ -2,25 +2,33 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from './schemas/user.schema';
-import { Model } from 'mongoose';
+import { Model, ObjectId } from 'mongoose';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
 import { MailerService } from '@nestjs-modules/mailer';
 import { JwtService } from '@nestjs/jwt';
+import { CloudinaryConfigService } from './cloudinary.config';
+// import { CloudinaryConfigService } from 'src/user/cloudinary.config';
 // import { JwtService } from '@nestjs/jwt';
 @Injectable()
 export class UserService {
-
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
     private readonly mailService: MailerService,
     private jwtService: JwtService,
+    private readonly cloudinaryConfigService: CloudinaryConfigService,
+    // private readonly cloudinaryConfigService: CloudinaryConfigService,
   ) {}
+  //
 
+  async uploadImageToCloudinary(file: Express.Multer.File) {
+    return this.cloudinaryConfigService.uploadImage(file);
+  }
   /**
    * Find a user by email
    * @param email - User's email address
@@ -79,8 +87,8 @@ export class UserService {
 
     const savedUser = await newUser.save();
     const payload: any = { userId: savedUser._id };
-    const token =  this.jwtService.sign(payload);
-    
+    const token = this.jwtService.sign(payload);
+
     //  / Replace with your token generation logic
     const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // Set expiry for 1 hour from now
 
@@ -148,4 +156,15 @@ export class UserService {
    * @param email - User's email address
    * @returns void
    */
+
+  async updateProfilePhoto(id: ObjectId, profile_photo: string) {
+    const update = await this.userModel.findByIdAndUpdate(
+      id,
+      {
+        profile_photo,
+      },
+      { new: true, runValidators: true },
+    );
+    return update;
+  }
 }

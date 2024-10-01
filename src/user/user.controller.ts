@@ -9,11 +9,18 @@ import {
   Param,
   Put,
   Delete,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import { UserService } from './user.service';
-import { User } from './schemas/user.schema';
-
+import { FileInterceptor } from '@nestjs/platform-express';
+import { multerOptions } from './cloudinary.multer';
+import { AuthGuard } from 'src/auth/auth.guard';
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
@@ -82,7 +89,7 @@ export class UserController {
   }
 
   @Delete(':id')
-  async delete( @Param('id') id: string) {
+  async delete(@Param('id') id: string) {
     try {
       const info = await this.userService.delete(id);
       return info;
@@ -93,4 +100,39 @@ export class UserController {
       );
     }
   }
+
+  @Post('profile-photo')
+  @UseGuards(AuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImage(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
+  ) {
+    console.log('first');
+    console.log(req.user);
+    if (!file) {
+      throw new Error('No file uploaded or Empty file');
+    }
+    const uploadedImage: any =
+      await this.userService.uploadImageToCloudinary(file);
+    const id: any = req.user;
+    await this.userService.updateProfilePhoto(id, uploadedImage.secure_url);
+    return {
+      message: 'Image uploaded successfully',
+      url: uploadedImage.secure_url,
+      public_id: uploadedImage.public_id,
+    };
+  }
+
+  // @Post('profile-photo')
+  // @UseInterceptors(FileInterceptor('file', multerOptions))
+  // async uploadImage(@UploadedFile() file: Express.Multer.File) {
+  //   console.log(file)
+  //   const uploadedImage:any = await this.userService.uploadImageToCloudinary(file);
+  //   return {
+  //     message: 'Image uploaded successfully',
+  //     url: uploadedImage.secure_url,
+  //     public_id: uploadedImage.public_id,
+  //   };
+  // }
 }

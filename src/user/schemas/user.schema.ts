@@ -5,9 +5,7 @@ export type UserDocument = HydratedDocument<User>;
 
 @Schema()
 export class User {
-
   @Prop()
-
   name: string;
 
   @Prop({ required: true, unique: true })
@@ -16,7 +14,7 @@ export class User {
   @Prop({ required: true })
   password: string;
 
-  @Prop({default:false})
+  @Prop({ default: false })
   isVerified: boolean;
 
   @Prop()
@@ -24,6 +22,9 @@ export class User {
 
   @Prop()
   verifyTokenExpiry: Date;
+
+  @Prop({ required: false }) 
+  profile_photo?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
