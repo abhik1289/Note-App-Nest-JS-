@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UserService } from 'src/user/user.service';
 import { LoginDto } from './dto/create-login.dto';
 import * as bcrypt from 'bcrypt';
+import { AuthGuard } from './auth.guard';
 // import { AuthGuard } from '@nestjs/passport';
 // import { AuthGuard } from './auth.guard';
 @Injectable()
@@ -26,7 +27,7 @@ export class AuthService {
     const payload = this.jwtService.verify(token, {
       secret: process.env.secret,
     });
-
+    console.log(payload);
     const user: any = await this.userService.findById(payload.userId);
     if (!user) {
       throw new NotFoundException('User not found');
@@ -55,10 +56,10 @@ export class AuthService {
     const payload = {
       userId: isExits._id,
     };
-    const token = this.jwtService.sign(payload);
-    return { access_token: token };
+    const token = await this.jwtService.signAsync(payload);
+    console.log('token: ' + token);
+    return {
+      access_token: token,
+    };
   }
-  // @UseGuards(AuthGuard)
-  
 }
-

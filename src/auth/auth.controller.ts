@@ -8,45 +8,57 @@ import {
   Param,
   Post,
   Res,
+  Request,
+  UseGuards,
+  ValidationPipe,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/create-login.dto';
 import { Response } from 'express';
+import { AuthGuard } from './auth.guard'; // Assuming you have an AuthGuard
+import { UserService } from 'src/user/user.service';
+
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly userService: UserService,
+  ) {}
 
-  @Get(':token')
-  verifyAccount(@Param('token') token: string) {
-    return this.authService.verifyAccount(token);
+  @Get('profile')
+  @UseGuards(AuthGuard)
+  async profile(@Request() req) {
+    return this.userService.findById(req.user);
   }
+  @Get(':token')
+  async verifyAccount(@Param('token') token: string) {
+    try {
+      return await this.authService.verifyAccount(token);
+    } catch (error) {
+      throw new HttpException('Invalid token', HttpStatus.BAD_REQUEST);
+    }
+  }
+
   @Post('login')
   async login(
-    @Body() loginDto: LoginDto,
+    @Body(new ValidationPipe()) loginDto: LoginDto,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const { access_token } = await this.authService.SignIn(loginDto);
-    // Set cookie
-    response.cookie('jwt', access_token, {
-      httpOnly: true, // Prevents client-side access to the cookie
-      maxAge: 3600000, // 1 hour in milliseconds
-    });
-
-    return { message: 'Logged in successfully' };
+    try {
+      const { access_token } = await this.authService.SignIn(loginDto);
+      response.cookie('jwt', access_token, {
+        httpOnly: true,
+        maxAge: 3600000,
+      });
+      return { message: 'Logged in successfully' };
+    } catch (error) {
+      throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
+    }
   }
+
   @Post('logout')
   logout(@Res({ passthrough: true }) response: Response) {
-    // Clear the cookie
     response.clearCookie('jwt');
-
     return { message: 'Logged out successfully' };
-
   }
-
-  
-  @Get()
-  getUser(){
-
-  }
-
 }
