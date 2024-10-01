@@ -1,14 +1,24 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from './schemas/user.schema';
 import { Model } from 'mongoose';
 import { CreateUserDto, UpdateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
-
+import * as nodemailer from 'nodemailer';
+import { MailerService } from '@nestjs-modules/mailer';
+import { JwtService } from '@nestjs/jwt';
+// import { JwtService } from '@nestjs/jwt';
 @Injectable()
 export class UserService {
+
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    private readonly mailService: MailerService,
+    private jwtService: JwtService,
   ) {}
 
   /**
@@ -21,17 +31,67 @@ export class UserService {
   }
 
   /**
-   * Create a new user
+   * Create a new user and send a welcome email
    * @param createUserDto - Data Transfer Object for creating a user
    * @returns The created user document
+   * @throws ConflictException if a user with the given email already exists
    */
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    // Hash the user password before saving
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-    const userData = { ...createUserDto, password: hashedPassword };
+  private async sendWelcomeEmail(
+    name: string,
+    email: string,
+    verificationToken: string,
+  ): Promise<void> {
+    const mailOptions = {
+      from: process.env.USER_EMAIL,
+      to: email,
+      subject: 'Welcome to Our App!',
+      html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; border: 1px solid #ddd;">
+        <h2 style="color: #333;">Welcome to Our Platform, ${name}!</h2>
+        <p>Thank you for registering with us. To activate your account, please verify your email address by clicking the link below:</p>
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${process.env.CLIENT_URL}?token=${verificationToken}" style="padding: 10px 15px; background: #0284c7; color: white; text-decoration: none; border-radius: 5px;">
+            Click Here to Verify Your Email
+          </a>
+        </div>
+        <p>If you did not sign up for this account, please disregard this email or <a href="https://yourapp.com/support" style="color: #0284c7;">contact support</a>.</p>
+        <p>Regards,</p>
+        <p><strong>Your App Team</strong></p>
+      </div>
+    `,
+    };
 
-    const newUser = new this.userModel(userData);
-    return newUser.save();
+    await this.mailService.sendMail(mailOptions);
+  }
+  async create(createUserDto: CreateUserDto): Promise<User> {
+    const { email, name, password } = createUserDto;
+
+    const existingUser = await this.findByEmail(email);
+    if (existingUser) {
+      throw new ConflictException(`User with email ${email} already exists`);
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new this.userModel({
+      ...createUserDto,
+      password: hashedPassword,
+    });
+
+    const savedUser = await newUser.save();
+    const payload: any = { userId: savedUser._id };
+    const token =  this.jwtService.sign(payload);
+    
+    //  / Replace with your token generation logic
+    const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // Set expiry for 1 hour from now
+
+    // Assign the token and expiry to the user
+    newUser.verifyToken = token;
+    newUser.verifyTokenExpiry = tokenExpiry;
+    await newUser.save();
+
+    await this.sendWelcomeEmail(name, email, token);
+
+    return savedUser;
   }
 
   /**
@@ -56,27 +116,36 @@ export class UserService {
    * @throws NotFoundException if the user is not found
    */
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const existingUser = await this.userModel
-      .findByIdAndUpdate(id, updateUserDto, {
-        new: true, // Return the updated document
-        runValidators: true, // Ensure validation rules are applied
-      })
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(id, updateUserDto, { new: true, runValidators: true })
       .exec();
 
-    if (!existingUser) {
+    if (!updatedUser) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    return existingUser;
+    return updatedUser;
   }
-  async delete(id: string): Promise<any> {
-    const deleteUser = await this.userModel.findByIdAndDelete(id);
-    if (!deleteUser) {
+
+  /**
+   * Delete a user by ID
+   * @param id - User ID
+   * @returns Success message if deletion is successful
+   * @throws NotFoundException if the user is not found
+   */
+  async delete(id: string): Promise<{ success: boolean; message: string }> {
+    const deletedUser = await this.userModel.findByIdAndDelete(id).exec();
+    if (!deletedUser) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
-    return {
-      success: true,
-      message: 'Successfully deleted',
-    };
+
+    return { success: true, message: 'User successfully deleted' };
   }
+
+  /**
+   * Send a welcome email to a new user
+   * @param name - User's name
+   * @param email - User's email address
+   * @returns void
+   */
 }
