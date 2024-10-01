@@ -8,9 +8,9 @@ import { MongooseModule } from '@nestjs/mongoose';
   imports: [
     ConfigModule.forRoot({
       envFilePath: '.development.env',
-      ignoreEnvFile: true,
+      isGlobal: true,
     }),
-    MongooseModule.forRoot(process.env.DATABASE_URl),
+    MongooseModule.forRoot(process.env.DATABASE_URL),
     UserModule,
   ],
   controllers: [AppController],
