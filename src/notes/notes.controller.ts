@@ -20,13 +20,15 @@ export class NotesController {
   @Post('create-note')
   @UseGuards(AuthGuard)
   create(@Body() createNoteDto: CreateNoteDto, @Request() req) {
+    console.log("Notes")
     const userId = req.user;
     return this.noteService.create(createNoteDto, userId);
   }
   @Get()
   @UseGuards(AuthGuard)
-  findNotes() {
-    return this.noteService.findAll();
+  findNotes(@Request() req) {
+    const userId = req.user;
+    return this.noteService.findAll(userId);
   }
   @Put(':id')
   @UseGuards(AuthGuard)

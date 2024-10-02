@@ -13,8 +13,13 @@ export class NotesService {
     const createdCat = new this.noteModel(data);
     return createdCat.save();
   }
-  async findAll() {
-    return this.noteModel.find().exec();
+  async findAll(userId: ObjectId) {
+    console.log(userId)
+    const notes = await this.noteModel.find({
+      userId: userId,
+    });
+    console.log(notes)
+    return notes;
   }
   async findByUserId(userId: ObjectId) {
     return this.noteModel.findById(userId);
@@ -31,15 +36,14 @@ export class NotesService {
     return updatedUser;
   }
   async delete(id: string) {
-    const deleteNote = await this.noteModel
-      .findByIdAndDelete(id);
+    const deleteNote = await this.noteModel.findByIdAndDelete(id);
     if (!deleteNote) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
     return {
-        success: true,
-        message:"Note deleted successfully"
-    }
+      success: true,
+      message: 'Note deleted successfully',
+    };
   }
 }

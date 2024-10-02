@@ -61,6 +61,7 @@ export class UserController {
   }
   // get user by Id
   @Get(':id')
+  @UseGuards(AuthGuard)
   async findById(@Param('id') id: string) {
     try {
       return this.userService.findById(id);
@@ -73,6 +74,7 @@ export class UserController {
   }
 
   @Put(':id')
+  @UseGuards(AuthGuard)
   async updateById(
     @Param('id') id: string,
     @Body() UpdateUserDto: UpdateUserDto,
@@ -85,10 +87,12 @@ export class UserController {
       throw new InternalServerErrorException(
         'An unexpected error occurred during user creation.',
       );
+      
     }
   }
 
   @Delete(':id')
+  @UseGuards(AuthGuard)
   async delete(@Param('id') id: string) {
     try {
       const info = await this.userService.delete(id);
